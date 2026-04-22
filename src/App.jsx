@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export default function App() {
   const [todos, setTodos] = useState([
@@ -8,6 +8,16 @@ export default function App() {
   ])
   const [input, setInput] = useState('')
   const [filter, setFilter] = useState('all')
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const editInputRef = useRef(null)
+
+  // Focus the edit input whenever editingId changes
+  useEffect(() => {
+    if (editingId !== null) {
+      editInputRef.current?.focus()
+    }
+  }, [editingId])
 
   const addTodo = () => {
     const text = input.trim()
@@ -20,6 +30,35 @@ export default function App() {
     setTodos(todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)))
 
   const deleteTodo = (id) => setTodos(todos.filter((t) => t.id !== id))
+
+  // Enter edit mode on double-click
+  const startEdit = (todo) => {
+    setEditingId(todo.id)
+    setEditText(todo.text)
+  }
+
+  // Save: empty text → delete; otherwise update
+  const saveEdit = (id) => {
+    const trimmed = editText.trim()
+    if (!trimmed) {
+      deleteTodo(id)
+    } else {
+      setTodos(todos.map((t) => (t.id === id ? { ...t, text: trimmed } : t)))
+    }
+    setEditingId(null)
+    setEditText('')
+  }
+
+  // Cancel: restore original text
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const handleEditKeyDown = (e, id) => {
+    if (e.key === 'Enter') saveEdit(id)
+    if (e.key === 'Escape') cancelEdit()
+  }
 
   const visible = todos.filter((t) =>
     filter === 'active' ? !t.done : filter === 'completed' ? t.done : true,
@@ -57,15 +96,16 @@ export default function App() {
         </div>
 
         <div className="flex gap-2 mb-4">
-          <button onClick={() => setFilter('all')} className={tabClass('all')}>
-            All
-          </button>
-          <button onClick={() => setFilter('active')} className={tabClass('active')}>
-            Active
-          </button>
-          <button onClick={() => setFilter('completed')} className={tabClass('completed')}>
-            Completed
-          </button>
+          {['all', 'active', 'completed'].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={tabClass(f)}
+              aria-pressed={filter === f}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
         </div>
 
         <ul className="space-y-2">
@@ -74,21 +114,54 @@ export default function App() {
               key={todo.id}
               className="flex items-center gap-3 px-3 py-2 rounded-md border border-slate-200 hover:bg-slate-50"
             >
-              <button
-                onClick={() => toggleTodo(todo.id)}
-                className={`flex-1 text-left ${
-                  todo.done ? 'line-through text-slate-400' : 'text-slate-800'
-                }`}
-              >
-                {todo.text}
-              </button>
-              <button
-                onClick={() => deleteTodo(todo.id)}
-                className="text-slate-400 hover:text-red-500 text-lg font-bold px-2"
-                aria-label="Delete todo"
-              >
-                ×
-              </button>
+              {editingId === todo.id ? (
+                // ── Edit mode ──────────────────────────────────────────────
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => handleEditKeyDown(e, todo.id)}
+                  onBlur={() => saveEdit(todo.id)}
+                  className="flex-1 px-2 py-0.5 border border-indigo-400 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                  aria-label="Edit todo"
+                />
+              ) : (
+                // ── View mode ──────────────────────────────────────────────
+                <button
+                  onClick={() => toggleTodo(todo.id)}
+                  onDoubleClick={() => startEdit(todo)}
+                  className={`flex-1 text-left ${
+                    todo.done ? 'line-through text-slate-400' : 'text-slate-800'
+                  }`}
+                  title="Double-click to edit"
+                >
+                  {todo.text}
+                </button>
+              )}
+
+              {editingId === todo.id ? (
+                // Cancel button shown during edit
+                <button
+                  onMouseDown={(e) => {
+                    // prevent the input's onBlur from firing first
+                    e.preventDefault()
+                    cancelEdit()
+                  }}
+                  className="text-slate-400 hover:text-slate-600 text-sm px-2"
+                  aria-label="Cancel edit"
+                >
+                  Esc
+                </button>
+              ) : (
+                <button
+                  onClick={() => deleteTodo(todo.id)}
+                  className="text-slate-400 hover:text-red-500 text-lg font-bold px-2"
+                  aria-label="Delete todo"
+                >
+                  ×
+                </button>
+              )}
             </li>
           ))}
           {visible.length === 0 && (
@@ -100,6 +173,11 @@ export default function App() {
 
         <div className="mt-4 text-sm text-slate-500">
           {remaining} {remaining === 1 ? 'item' : 'items'} left
+          {editingId && (
+            <span className="ml-2 text-indigo-400">
+              · Enter to save · Esc to cancel
+            </span>
+          )}
         </div>
       </div>
     </div>
