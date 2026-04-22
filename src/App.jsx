@@ -7,9 +7,11 @@ export default function App() {
     { id: 3, text: 'Write some code', done: false },
   ])
   const [input, setInput] = useState('')
+  const [inputDate, setInputDate] = useState('')
   const [filter, setFilter] = useState('all')
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
+  const [editDueDate, setEditDueDate] = useState('')
   const editInputRef = useRef(null)
 
   // Focus the edit input whenever editingId changes
@@ -22,8 +24,12 @@ export default function App() {
   const addTodo = () => {
     const text = input.trim()
     if (!text) return
-    setTodos([...todos, { id: Date.now(), text, done: false }])
+    setTodos([
+      ...todos,
+      { id: Date.now(), text, done: false, dueDate: inputDate || undefined },
+    ])
     setInput('')
+    setInputDate('')
   }
 
   const toggleTodo = (id) =>
@@ -35,6 +41,7 @@ export default function App() {
   const startEdit = (todo) => {
     setEditingId(todo.id)
     setEditText(todo.text)
+    setEditDueDate(todo.dueDate || '')
   }
 
   // Save: empty text → delete; otherwise update
@@ -43,16 +50,24 @@ export default function App() {
     if (!trimmed) {
       deleteTodo(id)
     } else {
-      setTodos(todos.map((t) => (t.id === id ? { ...t, text: trimmed } : t)))
+      setTodos(
+        todos.map((t) =>
+          t.id === id
+            ? { ...t, text: trimmed, dueDate: editDueDate || undefined }
+            : t,
+        ),
+      )
     }
     setEditingId(null)
     setEditText('')
+    setEditDueDate('')
   }
 
   // Cancel: restore original text
   const cancelEdit = () => {
     setEditingId(null)
     setEditText('')
+    setEditDueDate('')
   }
 
   const handleEditKeyDown = (e, id) => {
@@ -78,7 +93,7 @@ export default function App() {
       <div className="w-full max-w-md bg-white rounded-xl shadow-md p-6">
         <h1 className="text-2xl font-bold text-slate-800 mb-4">Todo List</h1>
 
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-end">
           <input
             type="text"
             value={input}
@@ -86,6 +101,14 @@ export default function App() {
             onKeyDown={(e) => e.key === 'Enter' && addTodo()}
             placeholder="What needs doing?"
             className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            aria-label="New todo"
+          />
+          <input
+            type="date"
+            value={inputDate}
+            onChange={(e) => setInputDate(e.target.value)}
+            className="w-full sm:w-40 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            aria-label="New todo due date"
           />
           <button
             onClick={addTodo}
@@ -116,16 +139,31 @@ export default function App() {
             >
               {editingId === todo.id ? (
                 // ── Edit mode ──────────────────────────────────────────────
-                <input
-                  ref={editInputRef}
-                  type="text"
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={(e) => handleEditKeyDown(e, todo.id)}
-                  onBlur={() => saveEdit(todo.id)}
-                  className="flex-1 px-2 py-0.5 border border-indigo-400 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
-                  aria-label="Edit todo"
-                />
+                <div
+                  className="flex-1 flex flex-col gap-2"
+                  onBlur={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget)) {
+                      saveEdit(todo.id)
+                    }
+                  }}
+                >
+                  <input
+                    ref={editInputRef}
+                    type="text"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={(e) => handleEditKeyDown(e, todo.id)}
+                    className="w-full px-2 py-0.5 border border-indigo-400 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                    aria-label="Edit todo"
+                  />
+                  <input
+                    type="date"
+                    value={editDueDate}
+                    onChange={(e) => setEditDueDate(e.target.value)}
+                    className="w-full sm:w-40 px-2 py-0.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                    aria-label="Edit todo due date"
+                  />
+                </div>
               ) : (
                 // ── View mode ──────────────────────────────────────────────
                 <button
@@ -136,7 +174,12 @@ export default function App() {
                   }`}
                   title="Double-click to edit"
                 >
-                  {todo.text}
+                  <span>{todo.text}</span>
+                  {todo.dueDate && (
+                    <span className="ml-2 text-sm text-slate-500">
+                      Due {new Date(todo.dueDate).toLocaleDateString()}
+                    </span>
+                  )}
                 </button>
               )}
 
